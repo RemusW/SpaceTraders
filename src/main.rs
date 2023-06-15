@@ -1,3 +1,6 @@
+mod mine_asteroid;
+mod dashboard;
+
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;

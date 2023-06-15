@@ -10,4 +10,4 @@ spacedust = "1.0.5"
 tokio = { version = "1.28.1", features = ["full"] }
 serde = "1.0"
 serde_json = "1.0"
-egui = "0.22.0"
+eframe = "0.22.0"
