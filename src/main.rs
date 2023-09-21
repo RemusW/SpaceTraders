@@ -3,18 +3,58 @@ mod agent_manager;
 // mod navigation;
 
 use std::fmt::Debug;
-use dashboard::SpaceConsole;
+// use dashboard::SpaceConsole;
 use serde::Serialize;
-use spacedust::apis::configuration::Configuration;
+use spacedust::apis::{configuration::Configuration, fleet_api::get_my_ships};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let native_options = eframe::NativeOptions::default();
-    let _ = eframe::run_native("My egui App", native_options, Box::new(|cc| Box::new(SpaceConsole::new(cc))));
+    // let native_options = eframe::NativeOptions::default();
+    // let _ = eframe::run_native("My egui App", native_options, Box::new(|cc| Box::new(SpaceConsole::new(cc))));
 
     let mut agent = agent_manager::Agent::new();
-    let _ = agent.login_agent().await;
-    agent.agent_info().await;
+    // agent.register_agent().await;
+    // let _ = agent.login_agent().await;
+    // agent.agent_info().await;
+    loop {
+        let mut input = String::new();
+
+        println!("Please enter something:");
+
+        std::io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
+        let input = input.trim();
+        println!("You entered: {}", input);
+
+        let cmd = match input {
+            "login" => Commands::Login,
+            "register" => Commands::Register,
+            "nav_to_asteroid" => Commands::NavToAsteroid,
+            _ => Commands::GetMyShips 
+        };
+        match cmd {
+            Commands::Login => {
+                let _ = agent.login_agent().await;
+            }
+            Commands::Register => {
+                let _ = agent.register_agent().await;
+            }
+            // Commands::NavToAsteroid => nav_to_asteroid(agent.conf, "WANDA-4").await,
+            Commands::GetMyShips => {
+                let my_ships_req = get_my_ships(&agent.conf, Some(1), Some(10)).await;
+                match my_ships_req {
+                    Ok(res) => {
+                        println!("{:#?}", res);
+                    }
+                    Err(err_res) => {
+                        println!("{:#?}", err_res);
+                    }
+                }
+            },
+            _ => println!("ererer")
+        } 
+    }
     // let my_ships_req = get_my_ships(&conf, Some(1), Some(10)).await;
     // nav_to_asteroid(&conf, "WANDA-4").await;
     // let ship_req = get_my_ship(&conf, "WANDA-4").await;
@@ -29,6 +69,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 
+enum Commands {
+    Login,
+    Register,
+    GetMyShips,
+    NavToAsteroid,
+    GetMyShip,
+    DockAndRefuel,
+    OrbitShip,
+}
 
 
 fn print_req<T: Debug+Serialize, E: Debug>(req: &Result<T, E>) {

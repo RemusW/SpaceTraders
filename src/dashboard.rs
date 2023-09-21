@@ -16,10 +16,10 @@ impl SpaceConsole {
 
 impl eframe::App for SpaceConsole {
    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        let mut agent = Agent::new();
-        let _ = agent.login_agent().await;
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Hello World!");
-        });
+        // let mut agent = Agent::new();
+        // let _ = agent.login_agent().await;
+        // egui::CentralPanel::default().show(ctx, |ui| {
+        //     ui.heading("Hello World!");
+        // });
    }
 } 
