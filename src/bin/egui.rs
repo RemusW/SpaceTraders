@@ -1,6 +1,21 @@
+mod agent_manager;
+
 use eframe::egui;
+use tokio::runtime::Runtime;
+use agent_manager::Agent;
 
 fn main() {
+    let rt = Runtime::new().expect("Unable to create Runtime");
+    let _enter = rt.enter();
+
+    // Execute the runtime in its own thread.
+    // The future doesn't have to do anything. In this example, it just sleeps forever.
+    std::thread::spawn(move || {
+        rt.block_on(async {
+        })
+    });
+
+
     let options = eframe::NativeOptions {
         // Hide the OS-specific "chrome" around the window:
         decorated: false,
@@ -11,6 +26,7 @@ fn main() {
         ..Default::default()
     };
     eframe::run_native("My egui App", options, Box::new(|cc| Box::new(MyEguiApp::new(cc))));
+    Ok(());
 }
 
 #[derive(Default)]
@@ -30,6 +46,12 @@ impl MyEguiApp {
             age : 12,
         }
     }
+
+    fn login(ctx: egui::Context) {
+        let mut agent = agent_manager::Agent::new();
+
+        ctx.request_repaint();
+    }   
 }
 
 impl eframe::App for MyEguiApp {

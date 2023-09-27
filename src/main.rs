@@ -1,11 +1,13 @@
 mod dashboard;
 mod agent_manager;
-// mod navigation;
-
+mod navigation;
 use std::fmt::Debug;
-// use dashboard::SpaceConsole;
 use serde::Serialize;
-use spacedust::apis::{configuration::Configuration, fleet_api::get_my_ships};
+
+// use dashboard::SpaceConsole;
+use spacedust::{apis::{configuration::Configuration, fleet_api::{get_my_ships, extract_resources, orbit_ship, ExtractResourcesError}, Error, contracts_api::{accept_contract, self, get_contracts, get_contract}, factions_api}, models::{ExtractResourcesRequest, FactionSymbols, faction, waypoint_trait}};
+
+use crate::navigation::dock_and_refuel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,12 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .read_line(&mut input)
             .expect("Failed to read line");
         let input = input.trim();
-        println!("You entered: {}", input);
 
         let cmd = match input {
             "login" => Commands::Login,
             "register" => Commands::Register,
-            "nav_to_asteroid" => Commands::NavToAsteroid,
+            "mine" => Commands::NavToAsteroid,
+            "get contract" => Commands::GetContract,
+            "finish" => Commands::CompleteContract,
             _ => Commands::GetMyShips 
         };
         match cmd {
@@ -40,17 +43,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Commands::Register => {
                 let _ = agent.register_agent().await;
             }
-            // Commands::NavToAsteroid => nav_to_asteroid(agent.conf, "WANDA-4").await,
-            Commands::GetMyShips => {
-                let my_ships_req = get_my_ships(&agent.conf, Some(1), Some(10)).await;
-                match my_ships_req {
-                    Ok(res) => {
-                        println!("{:#?}", res);
-                    }
-                    Err(err_res) => {
-                        println!("{:#?}", err_res);
-                    }
+            Commands::NavToAsteroid => {
+                nav(&agent.conf).await;
+            }
+            Commands::GetContract => {
+                let faction_req = factions_api::get_faction(&agent.conf, "COSMIC").await;
+                if let Ok(res) = faction_req {
+                    res.data.headquarters
                 }
+                let contracts_req = get_contracts(&agent.conf, Some(1), Some(10)).await;
+                print_req(&contracts_req);
+                
+                println!("Enter contract_id you wish to accept");
+                let mut input = String::new();
+                std::io::stdin()
+                    .read_line(&mut input)
+                    .expect("Failed to read line");
+                let input = input.trim();
+                let accept_contract_req = accept_contract(&agent.conf, input).await;
+                print_req(&accept_contract_req);
+            }
+            Commands::GetMyShips => {
+                let s = navigation::get_my_ships(&agent.conf).await;
+                println!("{:#?}", s);
             },
             _ => println!("ererer")
         } 
@@ -74,10 +89,42 @@ enum Commands {
     Register,
     GetMyShips,
     NavToAsteroid,
-    GetMyShip,
-    DockAndRefuel,
-    OrbitShip,
+    GetContract,
+    CompleteContract,
 }
+
+async fn nav(conf: &Configuration) {
+    let ship = navigation::get_my_ships(&conf).await;
+    match ship {
+        Some(ship) => {
+            println!("{:#?}", ship.nav);
+            navigation::nav_to_asteroid(&conf, &ship).await;
+            // dock_and_refuel(&conf, &ship).await;
+            // orbit_ship(&conf, &ship.symbol).await;
+            loop {
+                let eee = ExtractResourcesRequest::new();
+                let extraction_req = extract_resources(&conf, &ship.symbol, Some(eee)).await;                
+                match extraction_req {
+                    Ok(res) => {
+                        println!("{:#?}", res);
+                        tokio::time::sleep(std::time::Duration::
+                            from_secs(res.data.cooldown.total_seconds as u64)).await;
+                    }
+                    Err(e) => {
+                        eprintln!("{:#?}", e);
+                    }
+                }    
+                if ship.cargo.capacity <= ship.cargo.units {
+                    break;
+                }
+            }
+            println!("Done extrcting")
+        },
+        None => println!("Panic"),
+    }
+    
+}
+
 
 
 fn print_req<T: Debug+Serialize, E: Debug>(req: &Result<T, E>) {
