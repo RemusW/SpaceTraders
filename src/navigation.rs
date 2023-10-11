@@ -1,4 +1,4 @@
-use spacedust::{apis::{systems_api::*, fleet_api::{*, self}}, models::*};
+use spacedust::{apis::{systems_api::*, fleet_api::{*, self}, contracts_api::{get_contracts, self}, factions_api::get_faction}, models::*};
 use spacedust::apis::configuration::Configuration;
 use spacedust::models::waypoint_trait::Symbol;
 use spacedust::models::RefuelShipRequest;
@@ -91,6 +91,50 @@ pub async fn dock_and_refuel(conf: &Configuration, ship: &Ship) {
     // }
     let refuel_req = refuel_ship(&conf, &ship.symbol, Some(rr)).await;
     print_req(&refuel_req);
+}
+
+pub async fn deliver_contract(conf: &Configuration, ship: &Ship) -> Result<(), Box<dyn std::error::Error>>{
+    let get_contracts_resp = contracts_api::get_contracts(conf, Some(1), Some(10)).await?;
+    let contract = get_contracts_resp.data.get(0).unwrap();
+
+    // Nav to contract location
+    // let faction_symbol = contract.faction_symbol.to_string();
+    // let faction_resp = get_faction(conf, &faction_symbol).await?;
+    // let faction_hq = faction_resp.data.headquarters;
+    // let nav_req = NavigateShipRequest::new(faction_hq);
+
+    let deliveries = contract.terms.deliver.as_ref().unwrap();
+    for delivery_contract in deliveries {
+        for cargo_item in ship.cargo.inventory.iter() {
+            let delivery_symbol = delivery_contract.trade_symbol.to_string();
+            if delivery_symbol == cargo_item.symbol {
+                let units_to_deliver = delivery_contract.units_required - delivery_contract.units_fulfilled;
+                if units_to_deliver > 0 {
+                    // nav to delivery location
+                    let nav_req = NavigateShipRequest::new(delivery_contract.destination_symbol.to_string());
+                    let nav_resp = navigate_ship(conf, &ship.symbol, Some(nav_req)).await?;
+                    println!("Ship will arrive at {:?}", nav_resp.data.nav.route.arrival);
+                    loop {
+                        let ship_nav = get_ship_nav(conf, &ship.symbol).await?;
+                        if ship.nav.status == ShipNavStatus::InTransit {
+                            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                            println!("... traveling")
+                        }
+                        else {
+                            println!("Ship has arrived at {:?}", ship_nav.data.route.destination);
+                            break;
+                        }
+                    }
+
+                    let deliver_req = DeliverContractRequest::new(ship.symbol.to_string(), delivery_symbol, cargo_item.units);           
+                    let delivery_resp = contracts_api::deliver_contract(conf, &contract.id, Some(deliver_req)).await;
+                    print_req(&delivery_resp);
+                }
+            }
+        }
+    }
+    
+    Ok(())
 }
 
 fn print_req<T: Debug+Serialize, E: Debug>(req: &Result<T, E>) {

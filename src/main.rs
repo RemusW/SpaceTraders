@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 mod dashboard;
 mod agent_manager;
 mod navigation;
@@ -5,9 +7,8 @@ use std::fmt::Debug;
 use serde::Serialize;
 
 // use dashboard::SpaceConsole;
-use spacedust::{apis::{configuration::Configuration, fleet_api::{get_my_ships, extract_resources, orbit_ship, ExtractResourcesError}, Error, contracts_api::{accept_contract, self, get_contracts, get_contract}, factions_api}, models::{ExtractResourcesRequest, FactionSymbols, faction, waypoint_trait}};
+use spacedust::{apis::{configuration::Configuration, fleet_api::{extract_resources}, contracts_api::{accept_contract, get_contracts}, factions_api}, models::{ExtractResourcesRequest}};
 
-use crate::navigation::dock_and_refuel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,7 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "register" => Commands::Register,
             "mine" => Commands::NavToAsteroid,
             "get contract" => Commands::GetContract,
+            "deliver contract" => Commands::DeliverContract,
             "finish" => Commands::CompleteContract,
+            "sell" => Commands::Sell,
             _ => Commands::GetMyShips 
         };
         match cmd {
@@ -49,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Commands::GetContract => {
                 let faction_req = factions_api::get_faction(&agent.conf, "COSMIC").await;
                 if let Ok(res) = faction_req {
-                    res.data.headquarters
+                    println!("{}", res.data.headquarters);
                 }
                 let contracts_req = get_contracts(&agent.conf, Some(1), Some(10)).await;
                 print_req(&contracts_req);
@@ -67,6 +70,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let s = navigation::get_my_ships(&agent.conf).await;
                 println!("{:#?}", s);
             },
+            Commands::DeliverContract => {
+                let ship = navigation::get_my_ships(&agent.conf).await;
+                let req = navigation::deliver_contract(&agent.conf, &ship.unwrap()).await;
+                print_req(&req);
+            },
+            Commands::CompleteContract => {
+
+            },
+            Commands::Sell => {
+                sell(&agent.conf).await;
+            }
             _ => println!("ererer")
         } 
     }
@@ -90,7 +104,9 @@ enum Commands {
     GetMyShips,
     NavToAsteroid,
     GetContract,
+    DeliverContract,
     CompleteContract,
+    Sell
 }
 
 async fn nav(conf: &Configuration) {
@@ -125,6 +141,9 @@ async fn nav(conf: &Configuration) {
     
 }
 
+async fn sell(conf: &Configuration) {
+    
+}
 
 
 fn print_req<T: Debug+Serialize, E: Debug>(req: &Result<T, E>) {
